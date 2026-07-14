@@ -1,0 +1,101 @@
+{
+  "trip": {
+    "title": "Sample Journey",
+    "start": "2030-04-10",
+    "end": "2030-04-12",
+    "timezone": "Europe/Paris",
+    "summary": "A relaxed three-day city break with room for spontaneous stops."
+  },
+  "days": [
+    {
+      "date": "2030-04-10",
+      "base": "Central district",
+      "title": "Arrival and orientation",
+      "summary": "Keep the first day flexible after travel.",
+      "items": [
+        {
+          "time": "14:00",
+          "end_time": "15:00",
+          "name": "Hotel check-in",
+          "type": "hotel",
+          "location": "Hotel area",
+          "local_name": "",
+          "notes": "Store luggage if the room is not ready.",
+          "status": "planned",
+          "map_url": "https://www.openstreetmap.org/"
+        },
+        {
+          "time": "Flexible",
+          "end_time": "",
+          "name": "Neighborhood walk",
+          "type": "activity",
+          "location": "Nearby streets",
+          "local_name": "",
+          "notes": "Optional if arrival is delayed or travelers are tired.",
+          "status": "optional",
+          "map_url": ""
+        }
+      ]
+    },
+    {
+      "date": "2030-04-11",
+      "base": "Central district",
+      "title": "Main exploration day",
+      "summary": "Place the highest-priority activity before lunch.",
+      "items": [
+        {
+          "time": "09:00",
+          "end_time": "09:30",
+          "name": "Transfer to first activity",
+          "type": "transport",
+          "location": "Departure point",
+          "local_name": "",
+          "notes": "Re-check the current route before departure.",
+          "status": "planned",
+          "map_url": "https://www.openstreetmap.org/directions"
+        },
+        {
+          "time": "10:00",
+          "end_time": "12:00",
+          "name": "Priority activity",
+          "type": "activity",
+          "location": "Activity area",
+          "local_name": "",
+          "notes": "Opening hours and availability require current verification.",
+          "status": "planned",
+          "map_url": ""
+        },
+        {
+          "time": "12:00",
+          "end_time": "13:30",
+          "name": "Lunch and recovery buffer",
+          "type": "buffer",
+          "location": "Near the activity area",
+          "local_name": "",
+          "notes": "Protect this time instead of filling the entire day.",
+          "status": "planned",
+          "map_url": ""
+        }
+      ]
+    },
+    {
+      "date": "2030-04-12",
+      "base": "Central district",
+      "title": "Departure",
+      "summary": "Work backward from the required departure time.",
+      "items": [
+        {
+          "time": "T-3h",
+          "end_time": "",
+          "name": "Leave for departure terminal",
+          "type": "transport",
+          "location": "Departure terminal",
+          "local_name": "",
+          "notes": "Adjust the buffer for luggage and the verified route.",
+          "status": "planned",
+          "map_url": ""
+        }
+      ]
+    }
+  ]
+}
