@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -8,8 +9,23 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills" / "travel-itinerary-builder"
+SKILL_MD = SKILL_DIR / "SKILL.md"
 RENDERER = SKILL_DIR / "scripts" / "render_itinerary.py"
 EXAMPLE = SKILL_DIR / "templates" / "itinerary.example.json"
+REFERENCES = {
+    "existing-itinerary-project-workflow.md",
+    "map-linked-itinerary-revisions.md",
+    "renderer-verification.md",
+    "reusable-travel-artifact-sanitization.md",
+    "travel-expense-integration.md",
+}
+TEXT_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".json", ".txt"}
+CREDENTIAL_PATTERNS = {
+    "private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "GitHub token": re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),
+    "AWS access key": re.compile(r"AKIA[A-Z0-9]{16}"),
+    "bot token": re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{30,}\b"),
+}
 
 
 class FakeContext:
@@ -22,7 +38,9 @@ class FakeContext:
 
 class PluginTests(unittest.TestCase):
     def test_registers_bundled_skill(self):
-        spec = importlib.util.spec_from_file_location("travel_itinerary_plugin", ROOT / "__init__.py")
+        spec = importlib.util.spec_from_file_location(
+            "travel_itinerary_plugin", ROOT / "__init__.py"
+        )
         assert spec is not None
         assert spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -32,15 +50,65 @@ class PluginTests(unittest.TestCase):
         module.register(context)
 
         self.assertEqual(set(context.skills), {"travel-itinerary-builder"})
+        self.assertEqual(context.skills["travel-itinerary-builder"], SKILL_MD)
         self.assertTrue(context.skills["travel-itinerary-builder"].is_file())
 
-    def test_skill_frontmatter_and_scope(self):
-        content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
-        self.assertTrue(content.startswith("---\n"))
-        self.assertIn("name: travel-itinerary-builder", content)
-        self.assertIn("description:", content)
-        self.assertNotIn("session-specific", content.lower())
-        self.assertNotIn("private repository", content.lower())
+    def test_skill_metadata_matches_plugin_release(self):
+        skill = SKILL_MD.read_text(encoding="utf-8")
+        manifest = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
+
+        self.assertTrue(skill.startswith("---\n"))
+        self.assertIn("name: travel-itinerary-builder", skill)
+        self.assertIn("version: 1.2.0", skill)
+        self.assertIn("version: 1.2.0", manifest)
+        self.assertIn("trip-expenses", skill)
+
+    def test_all_linked_references_are_packaged(self):
+        skill = SKILL_MD.read_text(encoding="utf-8")
+        packaged = {path.name for path in (SKILL_DIR / "references").glob("*.md")}
+
+        self.assertEqual(packaged, REFERENCES)
+        for filename in REFERENCES:
+            path = SKILL_DIR / "references" / filename
+            self.assertTrue(path.is_file())
+            self.assertGreater(path.stat().st_size, 0)
+            self.assertIn(f"references/{filename}", skill)
+
+    def test_expense_module_preserves_ledger_and_currency_boundaries(self):
+        content = (
+            SKILL_DIR / "references" / "travel-expense-integration.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("independent ledger", content)
+        self.assertIn("Never add unlike currencies", content)
+        self.assertIn("examples and hypothetical fixtures as non-production data", content)
+        self.assertIn("unauthenticated private access remains denied", content)
+        self.assertIn("source and runtime", content)
+
+    def test_readme_documents_complete_install_and_usage(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("hermes plugins install", readme)
+        self.assertIn("hermes plugins enable travel-itinerary", readme)
+        self.assertIn("/skill travel-itinerary:travel-itinerary-builder", readme)
+        self.assertIn("Install as an editable local skill", readme)
+        self.assertIn("How to use it", readme)
+        self.assertIn("Add a private trip-expense view", readme)
+        self.assertNotIn("raw.githubusercontent.com", readme)
+
+    def test_public_tree_has_no_credentials_or_absolute_private_paths(self):
+        failures = []
+        for path in ROOT.rglob("*"):
+            if not path.is_file() or ".git" in path.parts or path.suffix not in TEXT_SUFFIXES:
+                continue
+            content = path.read_text(encoding="utf-8")
+            if re.search(r"/(?:home|Users|opt/data)/", content):
+                failures.append(f"absolute private path in {path.relative_to(ROOT)}")
+            for label, pattern in CREDENTIAL_PATTERNS.items():
+                if pattern.search(content):
+                    failures.append(f"{label} pattern in {path.relative_to(ROOT)}")
+
+        self.assertEqual(failures, [])
 
 
 class RendererTests(unittest.TestCase):

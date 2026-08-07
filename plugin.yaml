@@ -1,5 +1,5 @@
 name: travel-itinerary
-version: 1.0.0
-description: Generic trip planning and self-contained mobile HTML itinerary workflow
+version: 1.2.0
+description: Realistic trip planning, existing itinerary maintenance, mobile HTML, and isolated trip-expense integration
 author: Contributors
 license: MIT
