@@ -12,12 +12,19 @@ SKILL_DIR = ROOT / "skills" / "travel-itinerary-builder"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 RENDERER = SKILL_DIR / "scripts" / "render_itinerary.py"
 EXAMPLE = SKILL_DIR / "templates" / "itinerary.example.json"
+ALL_SKILLS = {
+    "travel-itinerary-builder",
+    "tabelog-budget-food-research",
+    "japan-transit-routing",
+    "jp-restaurant-search",
+}
 REFERENCES = {
     "existing-itinerary-project-workflow.md",
     "map-linked-itinerary-revisions.md",
     "renderer-verification.md",
     "reusable-travel-artifact-sanitization.md",
     "travel-expense-integration.md",
+    "gsheets-sync-workflow.md",
 }
 TEXT_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".json", ".txt"}
 CREDENTIAL_PATTERNS = {
@@ -49,9 +56,9 @@ class PluginTests(unittest.TestCase):
 
         module.register(context)
 
-        self.assertEqual(set(context.skills), {"travel-itinerary-builder"})
-        self.assertEqual(context.skills["travel-itinerary-builder"], SKILL_MD)
-        self.assertTrue(context.skills["travel-itinerary-builder"].is_file())
+        self.assertEqual(set(context.skills), ALL_SKILLS)
+        for name in ALL_SKILLS:
+            self.assertTrue(context.skills[name].is_file())
 
     def test_skill_metadata_matches_plugin_release(self):
         skill = SKILL_MD.read_text(encoding="utf-8")
@@ -59,9 +66,10 @@ class PluginTests(unittest.TestCase):
 
         self.assertTrue(skill.startswith("---\n"))
         self.assertIn("name: travel-itinerary-builder", skill)
-        self.assertIn("version: 1.2.0", skill)
-        self.assertIn("version: 1.2.0", manifest)
+        self.assertIn("version: 2.0.0", skill)
+        self.assertIn("version: 2.0.0", manifest)
         self.assertIn("trip-expenses", skill)
+        self.assertIn("references/gsheets-sync-workflow.md", skill)
 
     def test_all_linked_references_are_packaged(self):
         skill = SKILL_MD.read_text(encoding="utf-8")
