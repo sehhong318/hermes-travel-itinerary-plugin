@@ -24,7 +24,6 @@ REFERENCES = {
     "renderer-verification.md",
     "reusable-travel-artifact-sanitization.md",
     "travel-expense-integration.md",
-    "gsheets-sync-workflow.md",
 }
 TEXT_SUFFIXES = {".md", ".py", ".yaml", ".yml", ".json", ".txt"}
 CREDENTIAL_PATTERNS = {
@@ -66,10 +65,14 @@ class PluginTests(unittest.TestCase):
 
         self.assertTrue(skill.startswith("---\n"))
         self.assertIn("name: travel-itinerary-builder", skill)
-        self.assertIn("version: 2.0.0", skill)
-        self.assertIn("version: 2.0.0", manifest)
+        self.assertIn("version: 2.0.1", skill)
+        self.assertIn("version: 2.0.1", manifest)
+        self.assertNotIn("Sheets", manifest)
+        self.assertNotIn("OAuth", manifest)
+        self.assertNotIn("MCP", manifest)
         self.assertIn("trip-expenses", skill)
-        self.assertIn("references/gsheets-sync-workflow.md", skill)
+        self.assertNotIn("Google Sheets", skill)
+        self.assertNotIn("OAuth", skill)
 
     def test_all_linked_references_are_packaged(self):
         skill = SKILL_MD.read_text(encoding="utf-8")
@@ -102,6 +105,12 @@ class PluginTests(unittest.TestCase):
         self.assertIn("Install as an editable local skill", readme)
         self.assertIn("How to use it", readme)
         self.assertIn("Add a private trip-expense view", readme)
+        self.assertIn("packaged Transit client", readme)
+        self.assertIn("Tabelog access is best-effort", readme)
+        self.assertIn("export_itinerary.py", readme)
+        self.assertNotIn("Google Sheets", readme)
+        self.assertNotIn("OAuth", readme)
+        self.assertNotIn("MCP", readme)
         self.assertNotIn("raw.githubusercontent.com", readme)
 
     def test_public_tree_has_no_credentials_or_absolute_private_paths(self):

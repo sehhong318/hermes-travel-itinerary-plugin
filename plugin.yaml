@@ -1,5 +1,5 @@
 name: travel-itinerary
-version: 2.0.0
-description: Realistic trip planning, existing itinerary maintenance, mobile HTML, Google Sheets sync, Japan transit routing, and Tabelog food research
+version: 2.0.1
+description: Realistic trip planning, mobile HTML, local exports, resilient Japan transit routing, and best-effort Tabelog research
 author: Contributors
 license: MIT

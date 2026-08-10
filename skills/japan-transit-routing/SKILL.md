@@ -1,148 +1,113 @@
 ---
 name: japan-transit-routing
-description: "Use when planning Japan train routes — get live times."
-version: 1.0.0
+description: "Use when planning Japan transit with verified fallbacks."
+version: 1.1.0
 platforms: [macos, linux, windows]
 metadata:
   hermes:
-    tags: [japan, transit, trains, metro, routes, mcp, travel]
+    tags: [japan, transit, trains, metro, routes, travel]
 ---
 
-# Japan Transit Routing (live train times)
+# Japan Transit Routing
 
-Get REAL Japan train/metro departure times for trip planning. Google's
-Directions API does NOT serve Japan transit data (transit mode returns
-ZERO_RESULTS for Japan even when it works for other countries) — so use the
-**Transit API** (`api.transit.ls8h.com`) instead, directly or via the registered
-**japan-transit MCP server**.
+Plan Japan rail, metro, bus, and ferry legs without treating any single third-party
+service as authoritative. Timetables, platforms, fares, disruptions, and even API
+availability change. Always name the source, record when it was checked, and ask
+the traveler to recheck close to departure.
 
 ## When to use
 
-- User asks for Japan train/metro routes, times, fares, or "how do I get from A to B in Japan"
-- Verifying/refining a Japan itinerary's transport legs with live scheduled departures
-- Any Japan transit query where Google Maps API or Jorudan fails/blocked
+- The user asks how to travel between Japanese places.
+- An itinerary needs route order, transfer buffers, fares, or station codes.
+- A saved route must be rechecked before travel.
 
-## Quick path: registered MCP (preferred)
+## Source order
 
-`japan-transit` MCP server is registered in `~/.hermes/config.yaml`
-(`mcp_servers.japan-transit`), built from
-https://github.com/Anchovy-s3/japan-transit-mcp — a wrapper around the free,
-unauthenticated Transit API. Tools appear as `mcp_japan_transit_*` (they load at
-session start; if missing, the server may need a new session).
+1. **Official operator source** for service notices, planned engineering work,
+   airport access, ticket rules, and timetable confirmation.
+2. **A user-visible map or journey-planning app** for practical route comparison.
+3. **Optional Transit API** for structured suggestions and schedule-based
+   route candidates. Treat these as supporting data, not live operational truth.
 
-Tools: `suggest_places`, `suggest_stations`, `reverse_places`, `plan_route`,
-`guidance_plan`, `get_station`, `station_departures`, `list_feeds`,
-`list_operators`, `health`.
+Do not call a scheduled result “live” unless its source explicitly supplies
+real-time status and the response contains a freshness timestamp.
 
-Workflow: `suggest_places` (e.g. "梅田") → take the returned `endpoint` →
-`plan_route` with `from`/`to` endpoints + `date` (YYYYMMDD) + `time` (HH:MM) +
-`type=departure`.
+## Capability check
 
-### MCP tool-call examples (exact names)
+Before using an optional integration:
 
-Once loaded (new session), call the tools directly — they take the same params
-as the API:
+- For the direct API, make one bounded suggestion request with a 10-second
+  timeout and validate the JSON shape.
+- Do not install or configure unrelated external integrations as a prerequisite.
 
-```
-mcp_japan_transit_suggest_places(q="梅田", limit=3)
-   → returns places[] with "endpoint": "geo:34.703180,135.497801" (or feed-qualified id)
+This plugin packages a Python-standard-library client at
+`scripts/transit_client.py`. It validates suggestions and route response shapes,
+uses bounded timeouts, filters walk-only journeys, and raises an actionable
+`TransitServiceError` instead of returning plausible-looking data.
 
-mcp_japan_transit_plan_route(
-    from="geo:34.703180,135.497801",     # origin endpoint from suggest_places
-    to="geo:34.989607,135.767768",       # destination endpoint (七条)
-    date="20260825", time="09:30", type="departure",
-    numItineraries=3
-)
-   → journeys[] with departureSecs/arrivalSecs/durationSecs/transferCount/legs[]
+```python
+from transit_client import TransitServiceError, plan_route, suggest_places
 
-mcp_japan_transit_reverse_places(lat=34.4358, lon=135.2432, radiusMeters=100)
-   → nearby routable stations when you only have coordinates
-
-mcp_japan_transit_station_departures(id="osakametro-rail:大阪市高速電気鉄道-御堂筋線-梅田")
-   → live departure board for a station (license permitting)
-```
-
-Key: always pass the `endpoint` string verbatim from
-`suggest_places`/`reverse_places` into `plan_route` — never retype or guess it.
-`geo:lat,lon` endpoints route; `scrape-*` feed IDs don't (see Pitfalls).
-
-## Direct API path (no MCP needed)
-
-Base: `https://api.transit.ls8h.com` — free, no auth, read-only.
-
-```bash
-# 1. Find endpoints (returns `endpoint` field, e.g. "geo:34.703180,135.497801")
-curl -s "https://api.transit.ls8h.com/api/v1/places/suggest?q=%E6%A2%85%E7%94%B0&limit=3"
-
-# 2. Plan a route (date=YYYYMMDD, time=HH:MM, type=departure|arrival|first|last)
-curl -s "https://api.transit.ls8h.com/api/v1/plan?from=<endpoint>&to=<endpoint>&date=20260825&time=09:30&type=departure&numItineraries=3"
+try:
+    places = suggest_places("梅田", limit=3)
+    origin = places["places"][0]["endpoint"]
+    routes = plan_route(
+        origin,
+        "geo:34.9858,135.7588",
+        date="20260825",
+        time="09:30",
+    )
+except TransitServiceError:
+    routes = None  # continue with the Fallback workflow below
 ```
 
-Response shape: top-level keys `date`, `type`, `timezone`, `from`, `to`,
-`journeys`. Each journey: `departureSecs`, `arrivalSecs`, `durationSecs`,
-`transferCount`, `accessWalkSecs`, `egressWalkSecs`, `legs[]` (each with `mode`,
-`from.name`, `to.name`, `line`). **Times are seconds from service-date midnight
-in `timezone`** — values may exceed 86400 for after-midnight service. Convert:
-`h = secs//3600, m = (secs%3600)//60`.
+Pass API-returned endpoint strings verbatim. Do not invent feed-qualified IDs.
 
-## Station codes for itinerary sheets (learned from real use)
+## Optional direct API
 
-When writing transport rows to an itinerary, use the operator-specific station
-code format (verified via the API's feed-qualified IDs):
+Base URL: `https://api.transit.ls8h.com`
 
-| Operator / Line | Code format | Example |
-|---|---|---|
-| Osaka Metro Midosuji (M) | M + number | 梅田 M16, 淀屋橋 M17, 心斎橋 M19, 難波 M20 |
-| Osaka Metro Chuo (C) | C + number | — |
-| Osaka Metro Nagahori (N) | N + number | 心斎橋 N15, ドーム前千代崎 N12 |
-| Keihan Main Line | KH + number | 七条 KH38, 伏見稲荷 KH36, 祇園四条 KH39, 淀屋橋 KH01 |
-| Kintetsu Nara Line | A + number | 大阪難波 A01, 近鉄奈良 A28 |
-| Nankai Airport Line | NK + number | 難波 NK01, 関西空港 NK31 |
-| JR lines | no station codes | use line name: JR京都線 新快速 |
+- Suggestions: `/api/v1/places/suggest?q=<name>&limit=<1-10>`
+- Route planning: `/api/v1/plan?from=<endpoint>&to=<endpoint>&date=YYYYMMDD&time=HH:MM&type=departure&numItineraries=3`
 
-Typical headways for the frequency column: Osaka Metro 3-5 min, Keihan 5-10,
-JR Kyoto/Kobe/Sagano 15-30, Kintetsu Nara 20-30, Nankai Rapi:t 30, city bus
-10-20. Always note these are schedule-based; confirm on the ground.
+Service availability and feed coverage are mutable. A missing `/health` endpoint
+is not proof that route endpoints work or fail; probe the exact endpoint needed.
+Validate that `places`/`journeys` are lists and that each retained journey has a
+real transit leg.
 
-## Blocked alternatives (don't re-chase these)
+## Fallback
 
-- **Jorudan (`jorudan.co.jp`) is not curl-able.** Its search flow redirects
-  through `jid.jorudan.co.jp/jrd_uuid/` — a JS-driven UUID session assignment —
-  and `redirect2.cgi` rejects requests without that session cookie. curl gets an
-  infinite redirect loop / empty page. No query-string workaround found.
-- **MLIT 国土数値情報 railway data (`nlftp.mlit.go.jp/ksj/.../KsjTmplt-N02...`)
-  is GIS geometry, not a timetable.** It ships railway line shapes + station
-  coordinates as shapefiles (reference years 2015-2022) — no schedules, fares,
-  or routing.
-- **Google Directions API `mode=transit` returns ZERO_RESULTS for Japan** even
-  when the Directions API is enabled (verified: same key returns OK for NYC
-  transit, ZERO_RESULTS for Tokyo/Osaka).
+When the optional API is unavailable, malformed, stale, or geographically
+wrong:
 
-## Pitfalls
+1. Open an official operator planner or the user's map app.
+2. Record route, line, transfer station, approximate duration, fare, and source.
+3. Mark uncertain departure/platform details as `recheck-required`.
+4. Add transfer and station-navigation buffers instead of inventing exact times.
+5. Recheck official disruptions and the final route 1–3 days before travel and
+   again on departure day.
 
-- **`geo:<lat>,<lon>` endpoints work for routing; `scrape-*` feed IDs do NOT.**
-  Kansai Airport's Nankai feed is `scrape-nankai` (suggest-only, not routable) —
-  a `geo:` point at the airport routes via a nearby JR station instead (e.g.
-  新家). For airports/stations on scrape feeds, use the `geo:` endpoint from
-  suggest rather than the feed ID.
-- **Routable feeds are the GTFS/ODPT ones**: `osakametro-rail`, `jrwest-*`,
-  `kintetsu-*`, `keihan-*`, `hanshin-rail-*`, etc. Check `list_feeds` when a
-  station won't route.
-- **Walking routes pollute results**: `journeys[0]` can be a pure-walk itinerary
-  with `mode` null and huge `durationSecs`. Skip journeys with no rail/subway
-  legs when the user wants transit.
-- **Station name matching is fuzzy**: use Japanese station names in suggest (梅田
-  not "Umeda") for the best hits; the API returns `nameEn` when available.
-- **Don't claim exact minutes as gospel**: departures are schedule-based; always
-  tell the user to confirm on the ground (Google Maps app has Japan data the API
-  lacks).
+A fallback route is useful only when its uncertainty is visible. Never fabricate
+an API response or silently substitute typical headways for a timetable.
 
-## Verification
+## Station codes and headways
 
-After planning, sanity-check: journey durations and transfer counts should match
-common sense (e.g. Osaka→Kyoto ~30-50 min, Namba→Nara ~40 min). If the API
-returns `stationNotFound` for a `scrape-*` endpoint, switch to `geo:` coordinates
-from suggest.
+Station codes are line-specific. Verify them with an operator source before
+publication. Common patterns include Osaka Metro M/C/N, Keihan KH, Kintetsu A,
+and Nankai NK; JR stations may not use the same public code convention.
 
-Full endpoint/param reference and example verified routes:
-`references/transit-api-notes.md`
+Typical headways can help size buffers, but must be labeled estimates—not quoted
+as a particular departure. Peak/off-peak, weekends, holidays, and disruptions
+change them.
+
+## Validation checklist
+
+- Exact origin and destination branches/stations resolved.
+- Date, local time, weekday, and arrival/departure intent recorded.
+- Every journey has at least one rail/metro/bus/tram/ferry leg.
+- Duration and transfers pass a common-sense check.
+- Official alerts checked for important or same-day travel.
+- Source URL and checked-at time shown.
+- User is told what must be reconfirmed.
+
+Protocol notes and response examples are in `references/transit-api-notes.md`.

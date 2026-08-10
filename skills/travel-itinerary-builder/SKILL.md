@@ -1,7 +1,7 @@
 ---
 name: travel-itinerary-builder
 description: "Use when creating or revising a realistic multi-day plan, an existing phone-friendly itinerary project, or its optional trip-expense view. Establishes one authoritative source, validates timing and uncertainty, resolves map-linked revisions, keeps trip spending isolated from ordinary ledgers, generates or synchronizes accessible mobile HTML, and verifies the real protected artifact."
-version: 2.0.0
+version: 2.0.1
 author: Hermes Agent
 license: MIT
 created_by: agent
@@ -73,20 +73,15 @@ Follow `references/travel-expense-integration.md` for ledger boundaries, safe me
 
 **Completion criterion:** trip records and ordinary records cannot alter each other's counts or totals, each currency is independently reproducible, and the private itinerary expense view is verified in its requested location.
 
-### Google Sheets sync mode
+### Local export mode
 
-When the user wants the itinerary in a spreadsheet (or wants to edit the plan
-themselves), emit a styled Google Sheet that doubles as the editable source of
-truth, then keep canonical JSON and mobile HTML in sync with it. Follow
-`references/gsheets-sync-workflow.md` for the OAuth setup (user-owned desktop
-client — the gcloud default client 403s), the verified tab/column layout, the
-only-working hyperlink method (`textFormat.link`, not `=HYPERLINK()` formulas or
-the read-only `hyperlink` field), content-based formatting (never assumed row
-indices), and the clean-rebuild pattern (wipe → write → format in one pass).
+When the user wants a portable table or machine-readable copy, run
+`scripts/export_itinerary.py` to emit CSV, Markdown, or normalized JSON. The
+standard-library exporter reads the canonical source, writes atomically, and
+refuses to overwrite that source.
 
-**Completion criterion:** the sheet renders with real clickable links, day
-blocks are color-coded (optional=gray, planned=white, day=blue), and re-running
-the sync script reproduces the canonical JSON and mobile HTML from the sheet.
+**Completion criterion:** the requested local artifact is opened or parsed and
+the canonical input remains byte-for-byte unchanged.
 
 ## Phase 1 — Define the Planning Brief
 

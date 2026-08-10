@@ -1,6 +1,6 @@
 # Hermes Travel Itinerary Plugin
 
-A destination-neutral Hermes plugin for building realistic multi-day itineraries, maintaining existing private itinerary projects, optionally integrating a trip-expense view without mixing travel spending into an ordinary household ledger, emitting styled Google Sheets as an editable source of truth, routing Japan train trips with live times, and researching Japan restaurants on Tabelog at everyday budgets.
+A destination-neutral Hermes plugin for realistic multi-day itineraries, existing private-project maintenance, isolated trip-expense integration, local JSON/CSV/Markdown exports, resilient Japan transit planning, and best-effort restaurant research.
 
 ## What it covers
 
@@ -11,9 +11,9 @@ A destination-neutral Hermes plugin for building realistic multi-day itineraries
 - new projects using validated JSON and self-contained mobile HTML;
 - existing projects with their own authoritative HTML, JavaScript, YAML, database, tests, runtime copy, and authenticated page;
 - optional trip-expense integration with independent persistence, separate currency totals, safe rendering, and private live verification;
-- Google Sheets sync — styled day tabs, food map, transport legs, reminders, real clickable hyperlinks, and a sync loop back to canonical JSON + mobile HTML;
-- Japan transit routing with live departure times (Transit API / MCP) and operator-specific station codes;
-- Tabelog food research — budget-tier ¥1k-5k search with rate-limiting discipline, plus the award-tier Silver list;
+- local CSV/Markdown/JSON exports that preserve the canonical itinerary;
+- Japan transit routing with a packaged Transit client, official-source fallback, and operator-specific station codes;
+- Tabelog food research with challenge/wrong-page detection, source labels, and conservative fallback;
 - complete-tree privacy sanitation before public publication.
 
 The bundled generic renderer remains itinerary-only. The expense module is a workflow for integrating an independent trip ledger into an existing authenticated itinerary project, or for extending the renderer with an explicit private-data boundary and tests. It does not expose a real ledger in a public static page.
@@ -31,16 +31,18 @@ skills/
 │   │   ├── map-linked-itinerary-revisions.md
 │   │   ├── renderer-verification.md
 │   │   ├── reusable-travel-artifact-sanitization.md
-│   │   ├── travel-expense-integration.md
-│   │   └── gsheets-sync-workflow.md
+│   │   └── travel-expense-integration.md
 │   ├── scripts/
-│   │   └── render_itinerary.py
+│   │   ├── render_itinerary.py
+│   │   └── export_itinerary.py
 │   └── templates/
 │       └── itinerary.example.json
 ├── tabelog-budget-food-research/
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── scripts/tabelog_guard.py
 ├── japan-transit-routing/
 │   ├── SKILL.md
+│   ├── scripts/transit_client.py
 │   └── references/
 │       └── transit-api-notes.md
 └── jp-restaurant-search/
@@ -138,38 +140,37 @@ Core expense rules:
 - unified trip presentation must not erase ownership from an unrelated ordinary ledger;
 - authenticated content and unauthenticated denial both require verification.
 
-### Emit the itinerary as a styled Google Sheet
+### Export local itinerary formats
 
-```text
-Use travel-itinerary-builder in Google Sheets sync mode. Set up the user-owned
-OAuth desktop client, create the Day / Food Map / Transport / Reminders tabs,
-write rows with real clickable map hyperlinks (textFormat.link), color-code
-optional vs planned vs day headers, and provide a sync script that reads the
-sheet back into itinerary.json and the mobile HTML.
+```bash
+python3 skills/travel-itinerary-builder/scripts/export_itinerary.py \
+  itinerary.json itinerary.csv --format csv
+python3 skills/travel-itinerary-builder/scripts/export_itinerary.py \
+  itinerary.json itinerary.md --format markdown
+python3 skills/travel-itinerary-builder/scripts/export_itinerary.py \
+  itinerary.json itinerary-copy.json --format json
 ```
 
-The working hyperlink method is `textFormat.link` via `updateCells` —
-`=HYPERLINK()` formulas are unreliable on mobile and the `hyperlink` field is
-read-only in the Sheets API. See `references/gsheets-sync-workflow.md`.
+The exporter is standard-library-only, writes atomically, refuses to overwrite
+the canonical source, and has executable tests for all three formats.
 
 ### Research Japan restaurants at budget prices
 
 ```text
-Use tabelog-budget-food-research to find ¥1,000-5,000 restaurants on Tabelog
-for a Japan trip. Search the EN domain with curl, filter by dinner/lunch budget
-client-side, add kanji names via the Google Places API, pace requests to avoid
-rate limiting, and decide price tiers before searching (budget ¥1-3k / mid
-¥3-5k / splurge ¥5k+).
+Use tabelog-budget-food-research to find ¥1,000-5,000 restaurants for a Japan
+trip. Detect blocked, invalid, and wrong-title Tabelog pages before parsing;
+filter only verified fields and corroborate operational facts with official
+restaurant sources. Tabelog access is best-effort, never a guaranteed service.
 ```
 
-### Route Japan trains with live times
+### Route Japan trains with resilient fallbacks
 
 ```text
-Use japan-transit-routing to get live Japan train departures. Query the Transit
-API (api.transit.ls8h.com) directly or via the japan-transit MCP server, pass
-endpoints verbatim, skip pure-walk journeys, and use Japanese station names in
-suggest. Include operator-specific station codes (M/C/N for Osaka Metro, KH for
-Keihan, A for Kintetsu, NK for Nankai) and typical headways in itinerary sheets.
+Use japan-transit-routing to compare Japan routes. Use the packaged Transit
+client when its optional third-party endpoint is available, pass returned
+endpoints verbatim, reject malformed or walk-only results, and fall back to
+official operator planners or the user's map app. Label schedule-based data and
+recheck important legs before departure.
 ```
 
 ## Development
@@ -178,10 +179,15 @@ Keihan, A for Kintetsu, NK for Nankai) and typical headways in itinerary sheets.
 python3 -m unittest discover -s tests -v
 python3 -m py_compile \
   __init__.py \
-  skills/travel-itinerary-builder/scripts/render_itinerary.py
+  skills/travel-itinerary-builder/scripts/render_itinerary.py \
+  skills/travel-itinerary-builder/scripts/export_itinerary.py \
+  skills/japan-transit-routing/scripts/transit_client.py \
+  skills/tabelog-budget-food-research/scripts/tabelog_guard.py
 ```
 
-The tests verify plugin registration, skill metadata and linked files, renderer behavior, fail-closed input validation, public-tree sanitation, and absence of credential-like material.
+The tests verify plugin registration, metadata, linked files, renderer behavior,
+fail-closed validation, external-service fallbacks, challenge/wrong-page
+detection, public-tree sanitation, and absence of credential-like material.
 
 ## Privacy and security
 
