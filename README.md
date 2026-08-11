@@ -1,6 +1,6 @@
 # Hermes Travel Itinerary Plugin
 
-A destination-neutral Hermes plugin for building realistic multi-day itineraries, maintaining existing private itinerary projects, and optionally integrating a trip-expense view without mixing travel spending into an ordinary household ledger.
+A destination-neutral Hermes plugin for building realistic multi-day itineraries, maintaining existing private itinerary projects, optionally integrating a trip-expense view without mixing travel spending into an ordinary household ledger, emitting styled Google Sheets as an editable source of truth, routing Japan train trips with live times, and researching Japan restaurants on Tabelog at everyday budgets.
 
 ## What it covers
 
@@ -12,6 +12,9 @@ A destination-neutral Hermes plugin for building realistic multi-day itineraries
 - new projects using validated JSON and self-contained mobile HTML;
 - existing projects with their own authoritative HTML, JavaScript, YAML, database, tests, runtime copy, and authenticated page;
 - optional trip-expense integration with independent persistence, separate currency totals, safe rendering, and private live verification;
+- Google Sheets sync — styled day tabs, food map, transport legs, reminders, real clickable hyperlinks, and a sync loop back to canonical JSON + mobile HTML;
+- Japan transit routing with live departure times (Transit API / MCP) and operator-specific station codes;
+- Tabelog food research — budget-tier ¥1k-5k search with rate-limiting discipline, plus the award-tier Silver list;
 - complete-tree privacy sanitation before public publication.
 
 The bundled generic renderer remains itinerary-only. The expense module is a workflow for integrating an independent trip ledger into an existing authenticated itinerary project, or for extending the renderer with an explicit private-data boundary and tests. It does not expose a real ledger in a public static page.
@@ -21,18 +24,28 @@ The bundled generic renderer remains itinerary-only. The expense module is a wor
 ```text
 plugin.yaml
 __init__.py
-skills/travel-itinerary-builder/
-├── SKILL.md
-├── references/
-│   ├── existing-itinerary-project-workflow.md
-│   ├── map-linked-itinerary-revisions.md
-│   ├── renderer-verification.md
-│   ├── reusable-travel-artifact-sanitization.md
-│   └── travel-expense-integration.md
-├── scripts/
-│   └── render_itinerary.py
-└── templates/
-    └── itinerary.example.json
+skills/
+├── travel-itinerary-builder/
+│   ├── SKILL.md
+│   ├── references/
+│   │   ├── existing-itinerary-project-workflow.md
+│   │   ├── map-linked-itinerary-revisions.md
+│   │   ├── renderer-verification.md
+│   │   ├── reusable-travel-artifact-sanitization.md
+│   │   ├── travel-expense-integration.md
+│   │   └── gsheets-sync-workflow.md
+│   ├── scripts/
+│   │   └── render_itinerary.py
+│   └── templates/
+│       └── itinerary.example.json
+├── tabelog-budget-food-research/
+│   └── SKILL.md
+├── japan-transit-routing/
+│   ├── SKILL.md
+│   └── references/
+│       └── transit-api-notes.md
+└── jp-restaurant-search/
+    └── SKILL.md
 tests/
 └── test_plugin.py
 ```
@@ -125,6 +138,40 @@ Core expense rules:
 - examples and hypothetical records never enter production;
 - unified trip presentation must not erase ownership from an unrelated ordinary ledger;
 - authenticated content and unauthenticated denial both require verification.
+
+### Emit the itinerary as a styled Google Sheet
+
+```text
+Use travel-itinerary-builder in Google Sheets sync mode. Set up the user-owned
+OAuth desktop client, create the Day / Food Map / Transport / Reminders tabs,
+write rows with real clickable map hyperlinks (textFormat.link), color-code
+optional vs planned vs day headers, and provide a sync script that reads the
+sheet back into itinerary.json and the mobile HTML.
+```
+
+The working hyperlink method is `textFormat.link` via `updateCells` —
+`=HYPERLINK()` formulas are unreliable on mobile and the `hyperlink` field is
+read-only in the Sheets API. See `references/gsheets-sync-workflow.md`.
+
+### Research Japan restaurants at budget prices
+
+```text
+Use tabelog-budget-food-research to find ¥1,000-5,000 restaurants on Tabelog
+for a Japan trip. Search the EN domain with curl, filter by dinner/lunch budget
+client-side, add kanji names via the Google Places API, pace requests to avoid
+rate limiting, and decide price tiers before searching (budget ¥1-3k / mid
+¥3-5k / splurge ¥5k+).
+```
+
+### Route Japan trains with live times
+
+```text
+Use japan-transit-routing to get live Japan train departures. Query the Transit
+API (api.transit.ls8h.com) directly or via the japan-transit MCP server, pass
+endpoints verbatim, skip pure-walk journeys, and use Japanese station names in
+suggest. Include operator-specific station codes (M/C/N for Osaka Metro, KH for
+Keihan, A for Kintetsu, NK for Nankai) and typical headways in itinerary sheets.
+```
 
 ## Development
 
