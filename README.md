@@ -7,6 +7,7 @@ A destination-neutral Hermes plugin for building realistic multi-day itineraries
 - realistic day-by-day planning with transfers, buffers, optional stops, and uncertainty;
 - Google Maps short-link resolution and exact branch identification;
 - relation-based schedule revisions, including same-station continuity and ordered map waypoints;
+- stable cross-tab day-to-transport links with direct-hash loading and Google Maps Directions URLs;
 - restaurants, services, fittings, pickup cutoffs, and fallback plans;
 - new projects using validated JSON and self-contained mobile HTML;
 - existing projects with their own authoritative HTML, JavaScript, YAML, database, tests, runtime copy, and authenticated page;

@@ -74,6 +74,25 @@ class PluginTests(unittest.TestCase):
             self.assertGreater(path.stat().st_size, 0)
             self.assertIn(f"references/{filename}", skill)
 
+    def test_existing_project_workflow_covers_cross_tab_route_navigation(self):
+        content = (
+            SKILL_DIR / "references" / "existing-itinerary-project-workflow.md"
+        ).read_text(encoding="utf-8")
+
+        for expected in (
+            "stable day anchor",
+            "https://www.google.com/maps/dir/?api=1",
+            "travelmode=transit",
+            "travelmode=walking",
+            "hidden tab",
+            "hash load",
+            "hashchange",
+            'tabindex="-1"',
+            "scroll-margin-top",
+            "private itinerary values",
+        ):
+            self.assertIn(expected, content)
+
     def test_expense_module_preserves_ledger_and_currency_boundaries(self):
         content = (
             SKILL_DIR / "references" / "travel-expense-integration.md"
@@ -94,6 +113,7 @@ class PluginTests(unittest.TestCase):
         self.assertIn("Install as an editable local skill", readme)
         self.assertIn("How to use it", readme)
         self.assertIn("Add a private trip-expense view", readme)
+        self.assertIn("cross-tab day-to-transport links", readme)
         self.assertNotIn("raw.githubusercontent.com", readme)
 
     def test_public_tree_has_no_credentials_or_absolute_private_paths(self):
